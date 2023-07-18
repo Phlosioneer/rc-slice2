@@ -11,3 +11,4 @@ license = "MIT OR Apache-2.0"
 # Original repository URL for rc_slice
 #repository = "https://github.com/cole-miller/rc_slice"
 repository = "https://github.com/phlosioneer/rc-slice2"
+readme = "README.md"

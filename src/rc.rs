@@ -146,7 +146,7 @@ impl<T> RcSlice<T> {
         )
     }
 
-    /// This is the same as [`split_at`], but returns `None` if `mid > len` instead
+    /// This is the same as [`split_at`](RcSlice::split_at), but returns `None` if `mid > len` instead
     /// of panicking.
     ///
     /// ```
@@ -173,7 +173,7 @@ impl<T> RcSlice<T> {
         }
     }
 
-    /// This is an in-place version of [`try_split_at`].
+    /// This is an in-place version of [`try_split_at`](RcSlice::try_split_at).
     ///
     /// If `mid` is valid, mutates `it` to the upper half, and returns the lower half.
     /// Specifically, this will mutate the slice `it` to be `[mid, len)`, and returns the slice `[0, mid)`.
@@ -215,7 +215,7 @@ impl<T> RcSlice<T> {
         }
     }
 
-    /// This is an in-place version of [`try_split_at`].
+    /// This is an in-place version of [`try_split_at`](RcSlice::try_split_at).
     ///
     /// If `mid` is valid, mutates `it` to the lower half, and returns the upper half.
     /// Specifically, this will mutate the slice `it` to be `[0, mid)`, and returns the slice `[mid, len)`.
