@@ -5,14 +5,16 @@ use core::fmt;
 use core::hash::{Hash, Hasher};
 use core::ops::{Bound, Deref, Range, RangeBounds};
 
+use crate::RcSliceContainer;
+
 /// A read-only view into part of an underlying atomically reference-counted slice.
 ///
 /// The associated functions provided for this type do not take a receiver to avoid conflicting
 /// with (present or future) methods on `[T]`, since `ArcSlice<T>: Deref<Target = [T]>`. To reduce
 /// the length of code, it is recommended to include `use ArcSlice as Arcs` where needed.
-pub struct ArcSlice<T> {
+pub struct ArcSlice<T: ?Sized> {
     /// The underlying container.
-    underlying: Arc<[T]>,
+    underlying: Arc<T>,
     /// The start of the slice's range, inclusive.
     ///
     /// Must always be less than or equal to `end`.
@@ -27,7 +29,7 @@ pub struct ArcSlice<T> {
     end: usize,
 }
 
-impl<T> ArcSlice<T> {
+impl<T: RcSliceContainer + ?Sized> ArcSlice<T> {
     /////////////////////////////////////////////
     // Constructors
     //
@@ -47,7 +49,7 @@ impl<T> ArcSlice<T> {
     /// assert_eq!(*Arcs::new(&buffer, 0..=2), [2, 4, 6]);
     /// assert_eq!(*Arcs::new(&buffer, 10..), []);
     /// ```
-    pub fn new<R: RangeBounds<usize>>(underlying: &Arc<[T]>, range: R) -> Self {
+    pub fn new<R: RangeBounds<usize>>(underlying: &Arc<T>, range: R) -> Self {
         let start = match range.start_bound() {
             Bound::Excluded(x) => usize::min(x.saturating_add(1), underlying.len()),
             Bound::Included(x) => usize::min(*x, underlying.len()),
@@ -281,7 +283,7 @@ impl<T> ArcSlice<T> {
     }
 
     /// Returns the inner buffer.
-    pub fn inner(it: &Self) -> &Arc<[T]> {
+    pub fn inner(it: &Self) -> &Arc<T> {
         &it.underlying
     }
 
@@ -336,11 +338,11 @@ impl<T> ArcSlice<T> {
     /// assert_eq!(Arcs::advance(&mut slice, 2), Some([14, 16].as_slice()));
     /// assert_eq!(*slice, []);
     /// ```
-    pub fn advance(it: &mut Self, incr: usize) -> Option<&[T]> {
+    pub fn advance(it: &mut Self, incr: usize) -> Option<&[T::Item]> {
         let cut = it.start.checked_add(incr)?;
 
         if cut <= it.end {
-            let shed = &it.underlying[it.start..cut];
+            let shed = it.underlying.get(it.start..cut)?;
             it.start = cut;
 
             Some(shed)
@@ -382,10 +384,13 @@ impl<T> ArcSlice<T> {
     /// assert_eq!(Arcs::saturating_advance(&mut slice, 2), []);
     /// assert_eq!(*slice, []);
     /// ```
-    pub fn saturating_advance(it: &mut Self, incr: usize) -> &[T] {
+    pub fn saturating_advance(it: &mut Self, incr: usize) -> &[T::Item] {
         let cut = usize::min(it.start.saturating_add(incr), it.end);
 
-        let shed = &it.underlying[it.start..cut];
+        // TODO: Evaluate whether this will panic, and when.
+        // I believe it will only panic if the container trait impl
+        // is implemented weirdly.
+        let shed = it.underlying.get(it.start..cut).unwrap();
         it.start = cut;
         shed
     }
@@ -424,11 +429,11 @@ impl<T> ArcSlice<T> {
     /// assert_eq!(Arcs::retract(&mut slice, 2), Some([4, 6].as_slice()));
     /// assert_eq!(*slice, []);
     /// ```
-    pub fn retract(it: &mut Self, decr: usize) -> Option<&[T]> {
+    pub fn retract(it: &mut Self, decr: usize) -> Option<&[T::Item]> {
         let cut = it.end.checked_sub(decr)?;
 
         if cut >= it.start {
-            let shed = &it.underlying[cut..it.end];
+            let shed = it.underlying.get(cut..it.end)?;
             it.end = cut;
 
             Some(shed)
@@ -469,10 +474,13 @@ impl<T> ArcSlice<T> {
     /// assert_eq!(Arcs::saturating_retract(&mut slice, 2), []);
     /// assert_eq!(*slice, []);
     /// ```
-    pub fn saturating_retract(it: &mut Self, decr: usize) -> &[T] {
+    pub fn saturating_retract(it: &mut Self, decr: usize) -> &[T::Item] {
         let cut = usize::max(it.end.saturating_sub(decr), it.start);
 
-        let shed = &it.underlying[cut..it.end];
+        // TODO: Evaluate whether this will panic, and when.
+        // I believe it will only panic if the container trait impl
+        // is implemented weirdly.
+        let shed = it.underlying.get(cut..it.end).unwrap();
         it.end = cut;
         shed
     }
@@ -552,10 +560,12 @@ impl<T> ArcSlice<T> {
     /// assert_eq!(*high, [8, 6, 4]);
     /// assert_eq!(Arcs::get_mut(&mut low), None);
     /// ```
-    pub fn get_mut(it: &mut Self) -> Option<&mut [T]> {
+    pub fn get_mut(it: &mut Self) -> Option<&mut [T::Item]> {
         let start = it.start;
         let end = it.end;
-        Arc::get_mut(&mut it.underlying).map(|s: &mut [T]| &mut s[start..end])
+        Arc::get_mut(&mut it.underlying)
+            .map(|s| s.get_mut(start..end))
+            .flatten()
     }
 
     /// Checks if two ArcSlices reference the same slice of the same array in memory.
@@ -595,7 +605,58 @@ impl<T> ArcSlice<T> {
     }
 }
 
-impl<T> Clone for ArcSlice<T> {
+impl<T: RcSliceContainer + ?Sized + Default> ArcSlice<T> {
+    /// Tries to reduce the size of the original buffer, if this is the only
+    /// Arc or ArcSlice referencing the buffer.
+    /// ```
+    /// # extern crate alloc;
+    /// # use alloc::sync::Arc;
+    /// # use rc_slice::ArcSlice;
+    /// use ArcSlice as Arcs;
+    ///
+    /// let buffer: Vec<u8> = vec![2, 4, 6, 8, 10, 12];
+    /// let mut slice = Arcs::new(&Arc::new(buffer), 1..4);
+    ///
+    /// assert_eq!(*slice, [4, 6, 8]);
+    /// assert_eq!(**Arcs::inner(&slice), [2, 4, 6, 8, 10, 12]);
+    ///
+    /// assert_eq!(Arcs::shrink(&mut slice), true);
+    ///
+    /// assert_eq!(*slice, [4, 6, 8]);
+    /// assert_eq!(**Arcs::inner(&slice), [4, 6, 8]);
+    ///
+    /// ```
+    pub fn shrink(it: &mut Self) -> bool {
+        // This will be optimized away
+        if !T::IS_SHRINKABLE {
+            return false;
+        }
+
+        if it.start == 0 && it.end == it.underlying.len() {
+            return false;
+        }
+
+        let mut temp = Arc::new(T::default());
+        core::mem::swap(&mut temp, &mut it.underlying);
+        match Arc::try_unwrap(temp) {
+            Ok(mut container) => {
+                if let Some(new_range) = container.shrink_container_to_range(it.start..it.end) {
+                    it.start = new_range.start;
+                    it.end = new_range.end;
+                }
+                let mut temp2 = Arc::new(container);
+                core::mem::swap(&mut temp2, &mut it.underlying);
+                true
+            }
+            Err(mut temp2) => {
+                core::mem::swap(&mut temp2, &mut it.underlying);
+                false
+            }
+        }
+    }
+}
+
+impl<T: RcSliceContainer + ?Sized> Clone for ArcSlice<T> {
     fn clone(&self) -> Self {
         Self {
             underlying: self.underlying.clone(),
@@ -605,22 +666,22 @@ impl<T> Clone for ArcSlice<T> {
     }
 }
 
-impl<T> AsRef<[T]> for ArcSlice<T> {
-    fn as_ref(&self) -> &[T] {
-        &self.underlying[self.start..self.end]
+impl<T: RcSliceContainer + ?Sized> AsRef<[T::Item]> for ArcSlice<T> {
+    fn as_ref(&self) -> &[T::Item] {
+        self.underlying.get(self.start..self.end).unwrap()
     }
 }
 
-impl<T> Deref for ArcSlice<T> {
-    type Target = [T];
+impl<T: RcSliceContainer + ?Sized> Deref for ArcSlice<T> {
+    type Target = [T::Item];
 
     fn deref(&self) -> &Self::Target {
         self.as_ref()
     }
 }
 
-impl<T> From<Arc<[T]>> for ArcSlice<T> {
-    fn from(underlying: Arc<[T]>) -> Self {
+impl<T: RcSliceContainer + ?Sized> From<Arc<T>> for ArcSlice<T> {
+    fn from(underlying: Arc<T>) -> Self {
         Self::new(&underlying, ..)
     }
 }
@@ -632,47 +693,50 @@ fn test_from() {
     assert_eq!(*ref_slice, [4, 5, 6, 7]);
 }
 
-impl<T: fmt::Debug> fmt::Debug for ArcSlice<T> {
+impl<T: RcSliceContainer + fmt::Debug + ?Sized> fmt::Debug for ArcSlice<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.deref().fmt(f)
+        self.underlying.fmt(f)
     }
 }
 
-impl<T: PartialEq> PartialEq for ArcSlice<T> {
+impl<T: RcSliceContainer + PartialEq + ?Sized> PartialEq for ArcSlice<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.deref() == other.deref()
+        self.underlying == other.underlying
     }
 }
 
-impl<T: Eq> Eq for ArcSlice<T> {}
+impl<T: RcSliceContainer + Eq + ?Sized> Eq for ArcSlice<T> {}
 
-impl<T: PartialOrd> PartialOrd for ArcSlice<T> {
+impl<T: RcSliceContainer + PartialOrd + ?Sized> PartialOrd for ArcSlice<T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.deref().partial_cmp(other.deref())
+        self.underlying.partial_cmp(&other.underlying)
     }
 }
 
-impl<T: Ord> Ord for ArcSlice<T> {
+impl<T: RcSliceContainer + Ord + ?Sized> Ord for ArcSlice<T> {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.deref().cmp(other.deref())
+        self.underlying.cmp(&other.underlying)
     }
 }
 
-impl<T> Borrow<[T]> for ArcSlice<T> {
-    fn borrow(&self) -> &[T] {
+impl<T: RcSliceContainer + ?Sized> Borrow<[T::Item]> for ArcSlice<T> {
+    fn borrow(&self) -> &[T::Item] {
         self.as_ref()
     }
 }
 
-impl<T: Hash> Hash for ArcSlice<T> {
+impl<T> Hash for ArcSlice<T>
+where
+    T: RcSliceContainer + Hash + ?Sized,
+    T::Item: Hash,
+{
     fn hash<H: Hasher>(&self, state: &mut H) {
         Hash::hash_slice(self.deref(), state)
     }
 }
 
-impl<T> Default for ArcSlice<T> {
+impl<T: RcSliceContainer + Default + ?Sized> Default for ArcSlice<T> {
     fn default() -> Self {
-        let temp: Arc<[T]> = Arc::new([]);
-        Self::new(&temp, ..)
+        Self::new(&Arc::new(T::default()), ..)
     }
 }

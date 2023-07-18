@@ -5,14 +5,16 @@ use core::fmt;
 use core::hash::{Hash, Hasher};
 use core::ops::{Bound, Deref, Range, RangeBounds};
 
+use crate::RcSliceContainer;
+
 /// A read-only view into part of an underlying reference-counted slice.
 ///
 /// The associated functions provided for this type do not take a receiver to avoid conflicting
 /// with (present or future) methods on `[T]`, since `RcSlice<T>: Deref<Target = [T]>`. To reduce
 /// the length of code, it is recommended to include `use RcSlice as Rcs` where needed.
-pub struct RcSlice<T> {
+pub struct RcSlice<T: ?Sized> {
     /// The underlying container.
-    underlying: Rc<[T]>,
+    underlying: Rc<T>,
     /// The start of the slice's range, inclusive.
     ///
     /// Must always be less than or equal to `end`.
@@ -27,7 +29,7 @@ pub struct RcSlice<T> {
     end: usize,
 }
 
-impl<T> RcSlice<T> {
+impl<T: RcSliceContainer + ?Sized> RcSlice<T> {
     /////////////////////////////////////////////
     // Constructors
     //
@@ -47,7 +49,7 @@ impl<T> RcSlice<T> {
     /// assert_eq!(*Rcs::new(&buffer, 0..=2), [2, 4, 6]);
     /// assert_eq!(*Rcs::new(&buffer, 10..), []);
     /// ```
-    pub fn new<R: RangeBounds<usize>>(underlying: &Rc<[T]>, range: R) -> Self {
+    pub fn new<R: RangeBounds<usize>>(underlying: &Rc<T>, range: R) -> Self {
         let start = match range.start_bound() {
             Bound::Excluded(x) => usize::min(x.saturating_add(1), underlying.len()),
             Bound::Included(x) => usize::min(*x, underlying.len()),
@@ -281,7 +283,7 @@ impl<T> RcSlice<T> {
     }
 
     /// Returns the inner buffer.
-    pub fn inner(it: &Self) -> &Rc<[T]> {
+    pub fn inner(it: &Self) -> &Rc<T> {
         &it.underlying
     }
 
@@ -336,11 +338,11 @@ impl<T> RcSlice<T> {
     /// assert_eq!(Rcs::advance(&mut slice, 2), Some([14, 16].as_slice()));
     /// assert_eq!(*slice, []);
     /// ```
-    pub fn advance(it: &mut Self, incr: usize) -> Option<&[T]> {
+    pub fn advance(it: &mut Self, incr: usize) -> Option<&[T::Item]> {
         let cut = it.start.checked_add(incr)?;
 
         if cut <= it.end {
-            let shed = &it.underlying[it.start..cut];
+            let shed = it.underlying.get(it.start..cut)?;
             it.start = cut;
 
             Some(shed)
@@ -382,10 +384,13 @@ impl<T> RcSlice<T> {
     /// assert_eq!(Rcs::saturating_advance(&mut slice, 2), []);
     /// assert_eq!(*slice, []);
     /// ```
-    pub fn saturating_advance(it: &mut Self, incr: usize) -> &[T] {
+    pub fn saturating_advance(it: &mut Self, incr: usize) -> &[T::Item] {
         let cut = usize::min(it.start.saturating_add(incr), it.end);
 
-        let shed = &it.underlying[it.start..cut];
+        // TODO: Evaluate whether this will panic, and when.
+        // I believe it will only panic if the container trait impl
+        // is implemented weirdly.
+        let shed = it.underlying.get(it.start..cut).unwrap();
         it.start = cut;
         shed
     }
@@ -424,11 +429,11 @@ impl<T> RcSlice<T> {
     /// assert_eq!(Rcs::retract(&mut slice, 2), Some([4, 6].as_slice()));
     /// assert_eq!(*slice, []);
     /// ```
-    pub fn retract(it: &mut Self, decr: usize) -> Option<&[T]> {
+    pub fn retract(it: &mut Self, decr: usize) -> Option<&[T::Item]> {
         let cut = it.end.checked_sub(decr)?;
 
         if cut >= it.start {
-            let shed = &it.underlying[cut..it.end];
+            let shed = it.underlying.get(cut..it.end)?;
             it.end = cut;
 
             Some(shed)
@@ -469,10 +474,13 @@ impl<T> RcSlice<T> {
     /// assert_eq!(Rcs::saturating_retract(&mut slice, 2), []);
     /// assert_eq!(*slice, []);
     /// ```
-    pub fn saturating_retract(it: &mut Self, decr: usize) -> &[T] {
+    pub fn saturating_retract(it: &mut Self, decr: usize) -> &[T::Item] {
         let cut = usize::max(it.end.saturating_sub(decr), it.start);
 
-        let shed = &it.underlying[cut..it.end];
+        // TODO: Evaluate whether this will panic, and when.
+        // I believe it will only panic if the container trait impl
+        // is implemented weirdly.
+        let shed = it.underlying.get(cut..it.end).unwrap();
         it.end = cut;
         shed
     }
@@ -552,10 +560,12 @@ impl<T> RcSlice<T> {
     /// assert_eq!(*high, [8, 6, 4]);
     /// assert_eq!(Rcs::get_mut(&mut low), None);
     /// ```
-    pub fn get_mut(it: &mut Self) -> Option<&mut [T]> {
+    pub fn get_mut(it: &mut Self) -> Option<&mut [T::Item]> {
         let start = it.start;
         let end = it.end;
-        Rc::get_mut(&mut it.underlying).map(|s: &mut [T]| &mut s[start..end])
+        Rc::get_mut(&mut it.underlying)
+            .map(|s| s.get_mut(start..end))
+            .flatten()
     }
 
     /// Checks if two RcSlices reference the same slice of the same array in memory.
@@ -595,7 +605,58 @@ impl<T> RcSlice<T> {
     }
 }
 
-impl<T> Clone for RcSlice<T> {
+impl<T: RcSliceContainer + ?Sized + Default> RcSlice<T> {
+    /// Tries to reduce the size of the original buffer, if this is the only
+    /// Rc or RcSlice referencing the buffer.
+    /// ```
+    /// # extern crate alloc;
+    /// # use alloc::rc::Rc;
+    /// # use rc_slice::RcSlice;
+    /// use RcSlice as Rcs;
+    ///
+    /// let buffer: Vec<u8> = vec![2, 4, 6, 8, 10, 12];
+    /// let mut slice = Rcs::new(&Rc::new(buffer), 1..4);
+    ///
+    /// assert_eq!(*slice, [4, 6, 8]);
+    /// assert_eq!(**Rcs::inner(&slice), [2, 4, 6, 8, 10, 12]);
+    ///
+    /// assert_eq!(Rcs::shrink(&mut slice), true);
+    ///
+    /// assert_eq!(*slice, [4, 6, 8]);
+    /// assert_eq!(**Rcs::inner(&slice), [4, 6, 8]);
+    ///
+    /// ```
+    pub fn shrink(it: &mut Self) -> bool {
+        // This will be optimized away
+        if !T::IS_SHRINKABLE {
+            return false;
+        }
+
+        if it.start == 0 && it.end == it.underlying.len() {
+            return false;
+        }
+
+        let mut temp = Rc::new(T::default());
+        core::mem::swap(&mut temp, &mut it.underlying);
+        match Rc::try_unwrap(temp) {
+            Ok(mut container) => {
+                if let Some(new_range) = container.shrink_container_to_range(it.start..it.end) {
+                    it.start = new_range.start;
+                    it.end = new_range.end;
+                }
+                let mut temp2 = Rc::new(container);
+                core::mem::swap(&mut temp2, &mut it.underlying);
+                true
+            }
+            Err(mut temp2) => {
+                core::mem::swap(&mut temp2, &mut it.underlying);
+                false
+            }
+        }
+    }
+}
+
+impl<T: ?Sized> Clone for RcSlice<T> {
     fn clone(&self) -> Self {
         Self {
             underlying: self.underlying.clone(),
@@ -605,22 +666,25 @@ impl<T> Clone for RcSlice<T> {
     }
 }
 
-impl<T> AsRef<[T]> for RcSlice<T> {
-    fn as_ref(&self) -> &[T] {
-        &self.underlying[self.start..self.end]
+impl<T: RcSliceContainer + ?Sized> AsRef<[T::Item]> for RcSlice<T> {
+    fn as_ref(&self) -> &[T::Item] {
+        // TODO: Evaluate whether this will panic, and when.
+        // I believe it will only panic if the container trait impl
+        // is implemented weirdly.
+        self.underlying.get(self.start..self.end).unwrap()
     }
 }
 
-impl<T> Deref for RcSlice<T> {
-    type Target = [T];
+impl<T: RcSliceContainer + ?Sized> Deref for RcSlice<T> {
+    type Target = [T::Item];
 
     fn deref(&self) -> &Self::Target {
         self.as_ref()
     }
 }
 
-impl<T> From<Rc<[T]>> for RcSlice<T> {
-    fn from(underlying: Rc<[T]>) -> Self {
+impl<T: RcSliceContainer + ?Sized> From<Rc<T>> for RcSlice<T> {
+    fn from(underlying: Rc<T>) -> Self {
         Self::new(&underlying, ..)
     }
 }
@@ -632,47 +696,50 @@ fn test_from() {
     assert_eq!(*ref_slice, [4, 5, 6, 7]);
 }
 
-impl<T: fmt::Debug> fmt::Debug for RcSlice<T> {
+impl<T: RcSliceContainer + fmt::Debug + ?Sized> fmt::Debug for RcSlice<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.deref().fmt(f)
+        self.underlying.fmt(f)
     }
 }
 
-impl<T: PartialEq> PartialEq for RcSlice<T> {
+impl<T: RcSliceContainer + PartialEq + ?Sized> PartialEq for RcSlice<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.deref() == other.deref()
+        self.underlying == other.underlying
     }
 }
 
-impl<T: Eq> Eq for RcSlice<T> {}
+impl<T: RcSliceContainer + Eq + ?Sized> Eq for RcSlice<T> {}
 
-impl<T: PartialOrd> PartialOrd for RcSlice<T> {
+impl<T: RcSliceContainer + PartialOrd + ?Sized> PartialOrd for RcSlice<T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.deref().partial_cmp(other.deref())
+        self.underlying.partial_cmp(&other.underlying)
     }
 }
 
-impl<T: Ord> Ord for RcSlice<T> {
+impl<T: RcSliceContainer + Ord + ?Sized> Ord for RcSlice<T> {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.deref().cmp(other.deref())
+        self.underlying.cmp(&other.underlying)
     }
 }
 
-impl<T> Borrow<[T]> for RcSlice<T> {
-    fn borrow(&self) -> &[T] {
+impl<T: RcSliceContainer + ?Sized> Borrow<[T::Item]> for RcSlice<T> {
+    fn borrow(&self) -> &[T::Item] {
         self.as_ref()
     }
 }
 
-impl<T: Hash> Hash for RcSlice<T> {
+impl<T> Hash for RcSlice<T>
+where
+    T: RcSliceContainer + Hash + ?Sized,
+    T::Item: Hash,
+{
     fn hash<H: Hasher>(&self, state: &mut H) {
         Hash::hash_slice(self.deref(), state)
     }
 }
 
-impl<T> Default for RcSlice<T> {
+impl<T: RcSliceContainer + Default + ?Sized> Default for RcSlice<T> {
     fn default() -> Self {
-        let temp: Rc<[T]> = Rc::new([]);
-        Self::new(&temp, ..)
+        Self::new(&Rc::new(T::default()), ..)
     }
 }
