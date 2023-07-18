@@ -320,9 +320,9 @@ fn test_slice_container_smallvec() {
 }
 
 /// RcSlice over a byte slice.
-#[deprecated]
+#[deprecated(since = "0.4.0")]
 pub type RcBytes = RcSlice<[u8]>;
 
 /// ArcSlice over a byte slice.
-#[deprecated]
+#[deprecated(since = "0.4.0")]
 pub type ArcBytes = ArcSlice<[u8]>;
