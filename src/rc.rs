@@ -38,7 +38,7 @@ impl<T: RcSliceContainer + ?Sized> RcSlice<T> {
     ///
     /// ```
     /// # extern crate alloc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// # use alloc::rc::Rc;
     /// use RcSlice as Rcs;
     ///
@@ -76,7 +76,7 @@ impl<T: RcSliceContainer + ?Sized> RcSlice<T> {
     ///
     ///  ```
     /// # extern crate alloc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// # use alloc::rc::Rc;
     /// use RcSlice as Rcs;
     ///
@@ -99,7 +99,7 @@ impl<T: RcSliceContainer + ?Sized> RcSlice<T> {
     ///
     ///  ```
     /// # extern crate alloc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// # use alloc::rc::Rc;
     /// use RcSlice as Rcs;
     ///
@@ -118,13 +118,15 @@ impl<T: RcSliceContainer + ?Sized> RcSlice<T> {
     /// The first will contain all indices from `[0, mid)` (excluding the index `mid` itself)
     /// and the second will contain all indices from `[mid, len)` (excluding the index `len` itself).
     ///
+    /// This function DOES NOT DELETE unused parts of the original buffer. See [`shrink`](RcSlice::shrink).
+    ///
     /// # Panics
     ///
     /// Panics if `mid > it.len()`.
     ///
     /// ```
     /// # extern crate alloc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// # use alloc::rc::Rc;
     /// use RcSlice as Rcs;
     ///
@@ -148,12 +150,14 @@ impl<T: RcSliceContainer + ?Sized> RcSlice<T> {
         )
     }
 
-    /// This is the same as [`split_at`], but returns `None` if `mid > len` instead
+    /// This is the same as [`split_at`](RcSlice::split_at), but returns `None` if `mid > len` instead
     /// of panicking.
+    ///
+    /// This function DOES NOT DELETE unused parts of the original buffer. See [`shrink`](RcSlice::shrink).
     ///
     /// ```
     /// # extern crate alloc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// # use alloc::rc::Rc;
     /// use RcSlice as Rcs;
     ///
@@ -175,16 +179,18 @@ impl<T: RcSliceContainer + ?Sized> RcSlice<T> {
         }
     }
 
-    /// This is an in-place version of [`try_split_at`].
+    /// This is an in-place version of [`try_split_at`](RcSlice::try_split_at).
     ///
     /// If `mid` is valid, mutates `it` to the upper half, and returns the lower half.
     /// Specifically, this will mutate the slice `it` to be `[mid, len)`, and returns the slice `[0, mid)`.
     ///
     /// Returns `None` and leaves `it` unchanged if `mid` is outside the bounds of the slice.
     ///
+    /// This function DOES NOT DELETE unused parts of the original buffer. See [`shrink`](RcSlice::shrink).
+    ///
     ///  ```
     /// # extern crate alloc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// # use alloc::rc::Rc;
     /// use RcSlice as Rcs;
     ///
@@ -217,16 +223,18 @@ impl<T: RcSliceContainer + ?Sized> RcSlice<T> {
         }
     }
 
-    /// This is an in-place version of [`try_split_at`].
+    /// This is an in-place version of [`try_split_at`](RcSlice::try_split_at).
     ///
     /// If `mid` is valid, mutates `it` to the lower half, and returns the upper half.
     /// Specifically, this will mutate the slice `it` to be `[0, mid)`, and returns the slice `[mid, len)`.
     ///
     /// Returns `None` and leaves `it` unchanged if `mid` is outside the bounds of the slice.
     ///
+    /// This function DOES NOT DELETE unused parts of the original buffer. See [`shrink`](RcSlice::shrink).
+    ///
     ///  ```
     /// # extern crate alloc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// # use alloc::rc::Rc;
     /// use RcSlice as Rcs;
     ///
@@ -268,7 +276,7 @@ impl<T: RcSliceContainer + ?Sized> RcSlice<T> {
     /// ```
     /// # #![allow(deprecated)]
     /// # extern crate alloc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// # use alloc::rc::Rc;
     /// use RcSlice as Rcs;
     ///
@@ -277,7 +285,7 @@ impl<T: RcSliceContainer + ?Sized> RcSlice<T> {
     /// assert_eq!(Rcs::bounds(&Rcs::new(&buffer, ..)), (0, 5));
     /// assert_eq!(Rcs::bounds(&Rcs::new(&buffer, 1..3)), (1, 3));
     /// ```
-    #[deprecated(since = "0.3.0", note = "Use [`bounds_range`] instead.")]
+    #[deprecated(since = "0.4.0", note = "Use `bounds_range` instead.")]
     pub fn bounds(it: &Self) -> (usize, usize) {
         (it.start, it.end)
     }
@@ -291,7 +299,7 @@ impl<T: RcSliceContainer + ?Sized> RcSlice<T> {
     ///
     ///  ```
     /// # extern crate alloc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// # use alloc::rc::Rc;
     /// use RcSlice as Rcs;
     ///
@@ -310,11 +318,13 @@ impl<T: RcSliceContainer + ?Sized> RcSlice<T> {
     /// Returns `None` and leaves `self` unchanged if this operation would make the starting index
     /// greater than the ending index.
     ///
+    /// This function DOES NOT DELETE unused parts of the original buffer. See [`shrink`](RcSlice::shrink).
+    ///
     /// ```
     /// # #![allow(deprecated)]
     /// # extern crate alloc;
     /// # use alloc::rc::Rc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// use RcSlice as Rcs;
     ///
     /// let buffer: Rc<[u8]> = Rc::new([2, 4, 6, 8, 10, 12, 14, 16, 18]);
@@ -356,11 +366,13 @@ impl<T: RcSliceContainer + ?Sized> RcSlice<T> {
     ///
     /// If the slice doesn't contain enough elements, returns all available elements.
     ///
+    /// This function DOES NOT DELETE unused parts of the original buffer. See [`shrink`](RcSlice::shrink).
+    ///
     /// ```
     /// # #![allow(deprecated)]
     /// # extern crate alloc;
     /// # use alloc::rc::Rc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// use RcSlice as Rcs;
     ///
     /// let buffer: Rc<[u8]> = Rc::new([2, 4, 6, 8, 10, 12, 14, 16, 18]);
@@ -401,11 +413,13 @@ impl<T: RcSliceContainer + ?Sized> RcSlice<T> {
     /// Returns `None` and leaves `it` unchanged if this operation would make the ending index less
     /// than the starting index.
     ///
+    /// This function DOES NOT DELETE unused parts of the original buffer. See [`shrink`](RcSlice::shrink).
+    ///
     /// ```
     /// # #![allow(deprecated)]
     /// # extern crate alloc;
     /// # use alloc::rc::Rc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// use RcSlice as Rcs;
     ///
     /// let buffer: Rc<[u8]> = Rc::new([2, 4, 6, 8, 10, 12, 14, 16, 18]);
@@ -447,10 +461,12 @@ impl<T: RcSliceContainer + ?Sized> RcSlice<T> {
     ///
     /// If the slice doesn't contain enough elements, returns all available elements.
     ///
+    /// This function DOES NOT DELETE unused parts of the original buffer. See [`shrink`](RcSlice::shrink).
+    ///
     /// ```
     /// # extern crate alloc;
     /// # use alloc::rc::Rc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// use RcSlice as Rcs;
     ///
     /// let buffer: Rc<[u8]> = Rc::new([2, 4, 6, 8, 10, 12, 14, 16, 18]);
@@ -490,10 +506,12 @@ impl<T: RcSliceContainer + ?Sized> RcSlice<T> {
     ///
     /// Returns the actual range of the new slice.
     ///
+    /// This function DOES NOT DELETE unused parts of the original buffer. See [`shrink`](RcSlice::shrink).
+    ///
     /// ```
     /// # extern crate alloc;
     /// # use alloc::rc::Rc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// use RcSlice as Rcs;
     ///
     /// let buffer: Rc<[u8]> = Rc::new([2, 4, 6, 8, 10, 12, 14, 16, 18]);
@@ -529,7 +547,7 @@ impl<T: RcSliceContainer + ?Sized> RcSlice<T> {
     /// ```
     /// # extern crate alloc;
     /// # use alloc::rc::Rc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// use RcSlice as Rcs;
     ///
     /// let buffer: Rc<[u8]> = Rc::new([2, 4, 6, 8, 10, 12, 14, 16, 18]);
@@ -573,7 +591,7 @@ impl<T: RcSliceContainer + ?Sized> RcSlice<T> {
     /// ```
     /// # extern crate alloc;
     /// # use alloc::rc::Rc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// use RcSlice as Rcs;
     ///
     /// let buffer: Rc<[u8]> = Rc::new([2, 4, 6, 8, 10, 12, 14, 16, 18]);
@@ -608,22 +626,35 @@ impl<T: RcSliceContainer + ?Sized> RcSlice<T> {
 impl<T: RcSliceContainer + ?Sized + Default> RcSlice<T> {
     /// Tries to reduce the size of the original buffer, if this is the only
     /// Rc or RcSlice referencing the buffer.
+    ///
+    /// This operation doesn't preserve weak references.
     /// ```
     /// # extern crate alloc;
     /// # use alloc::rc::Rc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// use RcSlice as Rcs;
     ///
-    /// let buffer: Vec<u8> = vec![2, 4, 6, 8, 10, 12];
-    /// let mut slice = Rcs::new(&Rc::new(buffer), 1..4);
+    /// let buffer: Rc<Vec<u8>> = Rc::new(vec![2, 4, 6, 8, 10, 12]);
+    /// let mut slice = Rcs::new(&buffer, 1..4);
+    /// let weak_buffer = Rc::downgrade(&buffer);
     ///
     /// assert_eq!(*slice, [4, 6, 8]);
     /// assert_eq!(**Rcs::inner(&slice), [2, 4, 6, 8, 10, 12]);
     ///
+    /// // Shrink fails: there are two strong references.
+    /// assert_eq!(Rcs::shrink(&mut slice), false);
+    ///
+    /// core::mem::drop(buffer);
+    ///
+    /// // Shrink successful: only one strong reference.
     /// assert_eq!(Rcs::shrink(&mut slice), true);
     ///
+    /// // The slice is unchanged, and the buffer has shrunk.
     /// assert_eq!(*slice, [4, 6, 8]);
     /// assert_eq!(**Rcs::inner(&slice), [4, 6, 8]);
+    ///
+    /// // Weak references were not preserved.
+    /// assert_eq!(weak_buffer.upgrade(), None);
     ///
     /// ```
     pub fn shrink(it: &mut Self) -> bool {
