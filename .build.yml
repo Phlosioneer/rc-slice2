@@ -11,10 +11,12 @@ tasks:
       cd rc_slice
       cargo build --verbose
       cargo test --verbose
+      cargo test smallvec --features smallvec --verbose
       cargo doc --verbose --no-deps
   - beta: |
       rustup -q default beta
       cd rc_slice
       cargo build --verbose ||:
       cargo test --verbose ||:
+      cargo test smallvec --features smallvec --verbose ||:
       cargo doc --verbose --no-deps ||:

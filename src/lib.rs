@@ -2,6 +2,8 @@
 
 #![no_std]
 #![deny(unsafe_code)]
+#![deny(missing_docs)]
+#![deny(missing_debug_implementations)]
 
 extern crate alloc;
 
@@ -17,6 +19,7 @@ pub use rc::RcSlice;
 /// Trait implemented by any RcSlice-able container. Currently implemented for
 /// arrays, boxed arrays, and vectors.
 pub trait RcSliceContainer {
+    /// The type of the elements in this container.
     type Item;
 
     /// The code to call [`shrink_container_to_range`] is somewhat expensive. Setting this constant to
@@ -136,7 +139,7 @@ impl<T> RcSliceContainer for Vec<T> {
     fn shrink_container_to_range(&mut self, keep_range: Range<usize>) -> Option<Range<usize>> {
         // Avoid iterating over anything past the kept range.
         self.truncate(keep_range.end);
-        
+
         let mut cur_index = 0;
         self.retain(|_| {
             let ret = keep_range.contains(&cur_index);
@@ -208,6 +211,8 @@ impl<T: smallvec::Array> RcSliceContainer for smallvec::SmallVec<T> {
     }
 }
 
+// Note: Any other tests for smallvec must have the word "smallvec"
+// in the function name (no underscore). `.build.yml` depends on it.
 #[cfg(feature = "smallvec")]
 #[test]
 fn test_slice_container_smallvec() {
@@ -229,17 +234,18 @@ fn test_slice_container_smallvec() {
     assert_eq!(*slice, [4, 6, 8]);
     assert_eq!(RcSlice::inner(&slice).as_ref().as_ref(), [2, 4, 6, 8, 10]);
     assert_eq!(RcSlice::inner(&slice).spilled(), true);
-    
+
     assert_eq!(RcSlice::shrink(&mut slice), true);
-    
+
     assert_eq!(*slice, [4, 6, 8]);
     assert_eq!(RcSlice::inner(&slice).as_ref().as_ref(), [4, 6, 8]);
     assert_eq!(RcSlice::inner(&slice).spilled(), false);
 }
 
-
+/// RcSlice over a byte slice.
 #[deprecated]
-pub type RcBytes = RcSlice<u8>;
+pub type RcBytes = RcSlice<[u8]>;
 
+/// ArcSlice over a byte slice.
 #[deprecated]
-pub type ArcBytes = ArcSlice<u8>;
+pub type ArcBytes = ArcSlice<[u8]>;

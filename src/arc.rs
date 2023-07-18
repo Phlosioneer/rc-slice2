@@ -118,6 +118,8 @@ impl<T: RcSliceContainer + ?Sized> ArcSlice<T> {
     /// The first will contain all indices from `[0, mid)` (excluding the index `mid` itself)
     /// and the second will contain all indices from `[mid, len)` (excluding the index `len` itself).
     ///
+    /// This function DOES NOT DELETE unused parts of the original buffer. See [`shrink`].
+    ///
     /// # Panics
     ///
     /// Panics if `mid > it.len()`.
@@ -151,6 +153,8 @@ impl<T: RcSliceContainer + ?Sized> ArcSlice<T> {
     /// This is the same as [`split_at`], but returns `None` if `mid > len` instead
     /// of panicking.
     ///
+    /// This function DOES NOT DELETE unused parts of the original buffer. See [`shrink`].
+    ///
     /// ```
     /// # extern crate alloc;
     /// # use rc_slice::ArcSlice;
@@ -182,6 +186,7 @@ impl<T: RcSliceContainer + ?Sized> ArcSlice<T> {
     ///
     /// Returns `None` and leaves `it` unchanged if `mid` is outside the bounds of the slice.
     ///
+    /// This function DOES NOT DELETE unused parts of the original buffer. See [`shrink`].
     ///  ```
     /// # extern crate alloc;
     /// # use rc_slice::ArcSlice;
@@ -224,6 +229,8 @@ impl<T: RcSliceContainer + ?Sized> ArcSlice<T> {
     ///
     /// Returns `None` and leaves `it` unchanged if `mid` is outside the bounds of the slice.
     ///
+    /// This function DOES NOT DELETE unused parts of the original buffer. See [`shrink`].
+    ///
     ///  ```
     /// # extern crate alloc;
     /// # use rc_slice::ArcSlice;
@@ -264,6 +271,11 @@ impl<T: RcSliceContainer + ?Sized> ArcSlice<T> {
     // larger container.
     //
 
+    /// Returns the inner buffer.
+    pub fn inner(it: &Self) -> &Arc<T> {
+        &it.underlying
+    }
+
     /// Returns the starting and ending indices of the view `it` within the underlying slice.
     /// ```
     /// # #![allow(deprecated)]
@@ -280,11 +292,6 @@ impl<T: RcSliceContainer + ?Sized> ArcSlice<T> {
     #[deprecated(since = "0.3.0", note = "Use [`bounds_range`] instead.")]
     pub fn bounds(it: &Self) -> (usize, usize) {
         (it.start, it.end)
-    }
-
-    /// Returns the inner buffer.
-    pub fn inner(it: &Self) -> &Arc<T> {
-        &it.underlying
     }
 
     /// Returns the range that this slice represents.
@@ -309,6 +316,8 @@ impl<T: RcSliceContainer + ?Sized> ArcSlice<T> {
     ///
     /// Returns `None` and leaves `self` unchanged if this operation would make the starting index
     /// greater than the ending index.
+    ///
+    /// This function DOES NOT DELETE unused parts of the original buffer. See [`shrink`].
     ///
     /// ```
     /// # #![allow(deprecated)]
@@ -356,6 +365,8 @@ impl<T: RcSliceContainer + ?Sized> ArcSlice<T> {
     ///
     /// If the slice doesn't contain enough elements, returns all available elements.
     ///
+    /// This function DOES NOT DELETE unused parts of the original buffer. See [`shrink`].
+    ///
     /// ```
     /// # #![allow(deprecated)]
     /// # extern crate alloc;
@@ -400,6 +411,8 @@ impl<T: RcSliceContainer + ?Sized> ArcSlice<T> {
     ///
     /// Returns `None` and leaves `it` unchanged if this operation would make the ending index less
     /// than the starting index.
+    ///
+    /// This function DOES NOT DELETE unused parts of the original buffer. See [`shrink`].
     ///
     /// ```
     /// # #![allow(deprecated)]
@@ -447,6 +460,8 @@ impl<T: RcSliceContainer + ?Sized> ArcSlice<T> {
     ///
     /// If the slice doesn't contain enough elements, returns all available elements.
     ///
+    /// This function DOES NOT DELETE unused parts of the original buffer. See [`shrink`].
+    ///
     /// ```
     /// # extern crate alloc;
     /// # use alloc::sync::Arc;
@@ -485,10 +500,14 @@ impl<T: RcSliceContainer + ?Sized> ArcSlice<T> {
         shed
     }
 
+    /// WARNING: This function is unstable and may change or be removed in future versions!
+    /// 
     /// Adjusts the range of the slice. Roughly equivalent to `ArcSlice::new(it.inner(), new_range)`,
     /// but the change is made in-place.
     ///
     /// Returns the actual range of the new slice.
+    ///
+    /// This function DOES NOT DELETE unused parts of the original buffer. See [`shrink`].
     ///
     /// ```
     /// # extern crate alloc;
