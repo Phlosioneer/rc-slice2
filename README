@@ -1,7 +1,0 @@
-[![builds.sr.ht status](https://builds.sr.ht/~cole-miller/rc_slice/commits.svg)](https://builds.sr.ht/~cole-miller/rc_slice/commits?)
-
-The rc_slice library provides Rust types representing read-only views into
-underlying reference-counted slices.
-
-rc_slice is released under the terms of the Apache License, version 2.0 (see
-LICENSE-APACHE) or the MIT license (see LICENSE-MIT), at your option.

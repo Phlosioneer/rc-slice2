@@ -36,7 +36,7 @@ impl<T> RcSlice<T> {
     ///
     /// ```
     /// # extern crate alloc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// # use alloc::rc::Rc;
     /// use RcSlice as Rcs;
     ///
@@ -74,7 +74,7 @@ impl<T> RcSlice<T> {
     ///
     ///  ```
     /// # extern crate alloc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// # use alloc::rc::Rc;
     /// use RcSlice as Rcs;
     ///
@@ -97,7 +97,7 @@ impl<T> RcSlice<T> {
     ///
     ///  ```
     /// # extern crate alloc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// # use alloc::rc::Rc;
     /// use RcSlice as Rcs;
     ///
@@ -122,7 +122,7 @@ impl<T> RcSlice<T> {
     ///
     /// ```
     /// # extern crate alloc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// # use alloc::rc::Rc;
     /// use RcSlice as Rcs;
     ///
@@ -151,7 +151,7 @@ impl<T> RcSlice<T> {
     ///
     /// ```
     /// # extern crate alloc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// # use alloc::rc::Rc;
     /// use RcSlice as Rcs;
     ///
@@ -182,7 +182,7 @@ impl<T> RcSlice<T> {
     ///
     ///  ```
     /// # extern crate alloc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// # use alloc::rc::Rc;
     /// use RcSlice as Rcs;
     ///
@@ -224,7 +224,7 @@ impl<T> RcSlice<T> {
     ///
     ///  ```
     /// # extern crate alloc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// # use alloc::rc::Rc;
     /// use RcSlice as Rcs;
     ///
@@ -266,7 +266,7 @@ impl<T> RcSlice<T> {
     /// ```
     /// # #![allow(deprecated)]
     /// # extern crate alloc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// # use alloc::rc::Rc;
     /// use RcSlice as Rcs;
     ///
@@ -275,7 +275,6 @@ impl<T> RcSlice<T> {
     /// assert_eq!(Rcs::bounds(&Rcs::new(&buffer, ..)), (0, 5));
     /// assert_eq!(Rcs::bounds(&Rcs::new(&buffer, 1..3)), (1, 3));
     /// ```
-    #[deprecated(since = "0.3.0", note = "Use [`bounds_range`] instead.")]
     pub fn bounds(it: &Self) -> (usize, usize) {
         (it.start, it.end)
     }
@@ -289,7 +288,7 @@ impl<T> RcSlice<T> {
     ///
     ///  ```
     /// # extern crate alloc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// # use alloc::rc::Rc;
     /// use RcSlice as Rcs;
     ///
@@ -312,7 +311,7 @@ impl<T> RcSlice<T> {
     /// # #![allow(deprecated)]
     /// # extern crate alloc;
     /// # use alloc::rc::Rc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// use RcSlice as Rcs;
     ///
     /// let buffer: Rc<[u8]> = Rc::new([2, 4, 6, 8, 10, 12, 14, 16, 18]);
@@ -358,7 +357,7 @@ impl<T> RcSlice<T> {
     /// # #![allow(deprecated)]
     /// # extern crate alloc;
     /// # use alloc::rc::Rc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// use RcSlice as Rcs;
     ///
     /// let buffer: Rc<[u8]> = Rc::new([2, 4, 6, 8, 10, 12, 14, 16, 18]);
@@ -400,7 +399,7 @@ impl<T> RcSlice<T> {
     /// # #![allow(deprecated)]
     /// # extern crate alloc;
     /// # use alloc::rc::Rc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// use RcSlice as Rcs;
     ///
     /// let buffer: Rc<[u8]> = Rc::new([2, 4, 6, 8, 10, 12, 14, 16, 18]);
@@ -445,7 +444,7 @@ impl<T> RcSlice<T> {
     /// ```
     /// # extern crate alloc;
     /// # use alloc::rc::Rc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// use RcSlice as Rcs;
     ///
     /// let buffer: Rc<[u8]> = Rc::new([2, 4, 6, 8, 10, 12, 14, 16, 18]);
@@ -485,7 +484,7 @@ impl<T> RcSlice<T> {
     /// ```
     /// # extern crate alloc;
     /// # use alloc::rc::Rc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// use RcSlice as Rcs;
     ///
     /// let buffer: Rc<[u8]> = Rc::new([2, 4, 6, 8, 10, 12, 14, 16, 18]);
@@ -521,7 +520,7 @@ impl<T> RcSlice<T> {
     /// ```
     /// # extern crate alloc;
     /// # use alloc::rc::Rc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// use RcSlice as Rcs;
     ///
     /// let buffer: Rc<[u8]> = Rc::new([2, 4, 6, 8, 10, 12, 14, 16, 18]);
@@ -563,7 +562,7 @@ impl<T> RcSlice<T> {
     /// ```
     /// # extern crate alloc;
     /// # use alloc::rc::Rc;
-    /// # use rc_slice::RcSlice;
+    /// # use rc_slice2::RcSlice;
     /// use RcSlice as Rcs;
     ///
     /// let buffer: Rc<[u8]> = Rc::new([2, 4, 6, 8, 10, 12, 14, 16, 18]);

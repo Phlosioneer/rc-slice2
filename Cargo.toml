@@ -1,15 +1,13 @@
 [package]
-name = "rc_slice"
-version = "0.3.0"
+name = "rc-slice2"
+version = "0.3.1"
 
-authors = ["Cole Miller <m@cole-miller.net>"]
+authors = ["Cole Miller <m@cole-miller.net>, Phlosioneer"]
 categories = ["data-structures", "memory-management", "no-std"]
+keywords = ["rc", "arc", "slice", "range", "vector"]
 description = "Reference-counted slices with easy subdivision"
-edition = "2018"
+edition = "2021"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/cole-miller/rc_slice"
-
-[badges]
-maintenance = { status = "actively-developed" }
-
-[dependencies]
+# Original repository URL for rc_slice
+#repository = "https://github.com/cole-miller/rc_slice"
+repository = "https://github.com/phlosioneer/rc-slice2"
