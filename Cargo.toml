@@ -13,3 +13,7 @@ repository = "https://github.com/cole-miller/rc_slice"
 maintenance = { status = "actively-developed" }
 
 [dependencies]
+smallvec = { version = "1.11.0", optional = true }
+
+[features]
+smallvec = ["dep:smallvec"]

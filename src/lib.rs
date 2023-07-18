@@ -134,6 +134,9 @@ impl<T> RcSliceContainer for Vec<T> {
     }
 
     fn shrink_container_to_range(&mut self, keep_range: Range<usize>) -> Option<Range<usize>> {
+        // Avoid iterating over anything past the kept range.
+        self.truncate(keep_range.end);
+        
         let mut cur_index = 0;
         self.retain(|_| {
             let ret = keep_range.contains(&cur_index);
@@ -167,6 +170,73 @@ fn test_slice_container_vec() {
     assert_eq!(*slice, [4, 6, 8]);
     assert_eq!(**RcSlice::inner(&slice), [4, 6, 8]);
 }
+
+#[cfg(feature = "smallvec")]
+impl<T: smallvec::Array> RcSliceContainer for smallvec::SmallVec<T> {
+    type Item = T::Item;
+    const IS_SHRINKABLE: bool = true;
+
+    fn len(&self) -> usize {
+        self.len()
+    }
+
+    fn get(&self, range: Range<usize>) -> Option<&[Self::Item]> {
+        self.as_slice().get(range)
+    }
+
+    fn get_mut(&mut self, range: Range<usize>) -> Option<&mut [Self::Item]> {
+        self.as_mut_slice().get_mut(range)
+    }
+
+    fn shrink_container_to_range(&mut self, keep_range: Range<usize>) -> Option<Range<usize>> {
+        if !self.spilled() {
+            // No point to shrink anything.
+            return None;
+        }
+
+        // Avoid iterating over anything past the kept range.
+        self.truncate(keep_range.end);
+
+        let mut cur_index = 0;
+        self.retain(|_| {
+            let ret = keep_range.contains(&cur_index);
+            cur_index += 1;
+            ret
+        });
+        self.shrink_to_fit();
+        Some(0..Self::len(self))
+    }
+}
+
+#[cfg(feature = "smallvec")]
+#[test]
+fn test_slice_container_smallvec() {
+    use alloc::rc::Rc;
+    use alloc::vec;
+    use smallvec::SmallVec;
+    use RcSlice as Rcs;
+
+    let buffer: Rc<SmallVec<[u8; 4]>> = Rc::new(SmallVec::from_vec(vec![2, 4, 6, 8, 10]));
+
+    assert_eq!(*Rcs::new(&buffer, 1..4), [4, 6, 8]);
+    assert_eq!(*Rcs::new(&buffer, ..), [2, 4, 6, 8, 10]);
+    assert_eq!(*Rcs::new(&buffer, 0..=2), [2, 4, 6]);
+    assert_eq!(*Rcs::new(&buffer, 10..), []);
+
+    let mut slice = Rcs::new(&buffer, 1..4);
+    core::mem::drop(buffer);
+    assert_eq!(Rc::strong_count(RcSlice::inner(&slice)), 1);
+    assert_eq!(*slice, [4, 6, 8]);
+    assert_eq!(RcSlice::inner(&slice).as_ref().as_ref(), [2, 4, 6, 8, 10]);
+    assert_eq!(RcSlice::inner(&slice).spilled(), true);
+    
+    assert_eq!(RcSlice::shrink(&mut slice), true);
+    
+    assert_eq!(*slice, [4, 6, 8]);
+    assert_eq!(RcSlice::inner(&slice).as_ref().as_ref(), [4, 6, 8]);
+    assert_eq!(RcSlice::inner(&slice).spilled(), false);
+}
+
 
 #[deprecated]
 pub type RcBytes = RcSlice<u8>;
