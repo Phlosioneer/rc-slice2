@@ -621,6 +621,50 @@ impl<T: RcSliceContainer + ?Sized> RcSlice<T> {
             && this.start == other.start
             && this.end == other.end
     }
+
+    /// This is like a normal slice indexing operation, but produces an RcSlice instead.
+    /// ```
+    /// # extern crate alloc;
+    /// # use rc_slice2::RcSlice;
+    /// # use alloc::vec::Vec;
+    /// # use alloc::rc::Rc;
+    /// use RcSlice as Rcs;
+    ///
+    /// let buffer: Rc<Vec<u8>> = Rc::new((0..10).into_iter().collect());
+    /// let slice = Rcs::new(&buffer, 3..8);
+    /// assert_eq!(*slice, [3, 4, 5, 6, 7]);
+    ///
+    /// // Returns an RcSlice of the same buffer.
+    /// assert_eq!(Rcs::index(&slice, 2..4), Rcs::new(&buffer, 5..7));
+    ///
+    /// // All kinds of ranges work.
+    /// assert_eq!(*Rcs::index(&slice, ..), [3, 4, 5, 6, 7]);
+    /// assert_eq!(*Rcs::index(&slice, 1..), [4, 5, 6, 7]);
+    /// assert_eq!(*Rcs::index(&slice, 8..), []);
+    /// assert_eq!(*Rcs::index(&slice, 5..), []);
+    /// assert_eq!(*Rcs::index(&slice, ..2), [3, 4]);
+    /// assert_eq!(*Rcs::index(&slice, ..70), [3, 4, 5, 6, 7]);
+    /// assert_eq!(*Rcs::index(&slice, 3..8), [6, 7]);
+    ///```
+    pub fn index<R: RangeBounds<usize>>(it: &Self, range: R) -> Self {
+        use Bound::*;
+        let mut start = match range.start_bound() {
+            Unbounded => it.start,
+            Included(s) => it.start.saturating_add(*s),
+            Excluded(s) => it.start.saturating_add(*s).saturating_sub(1),
+        };
+        let end = match range.end_bound() {
+            Unbounded => it.end,
+            Included(s) => usize::min(it.end, it.start.saturating_add(*s).saturating_add(1)),
+            Excluded(s) => usize::min(it.end, it.start.saturating_add(*s)),
+        };
+        start = usize::min(start, end);
+        RcSlice {
+            underlying: it.underlying.clone(),
+            start,
+            end,
+        }
+    }
 }
 
 impl<T: RcSliceContainer + ?Sized + Default> RcSlice<T> {
@@ -685,6 +729,23 @@ impl<T: RcSliceContainer + ?Sized + Default> RcSlice<T> {
             }
         }
     }
+}
+
+#[test]
+fn test_index_ranges() {
+    use RcSlice as Rcs;
+
+    let buffer: Rc<alloc::vec::Vec<u8>> = Rc::new((0..10).into_iter().collect());
+    let slice = Rcs::new(&buffer, 3..8);
+    assert_eq!(*slice, [3, 4, 5, 6, 7]);
+
+    assert_eq!(*Rcs::index(&slice, ..), [3, 4, 5, 6, 7]);
+    assert_eq!(*Rcs::index(&slice, 1..), [4, 5, 6, 7]);
+    assert_eq!(*Rcs::index(&slice, 8..), []);
+    assert_eq!(*Rcs::index(&slice, 5..), []);
+    assert_eq!(*Rcs::index(&slice, ..2), [3, 4]);
+    assert_eq!(*Rcs::index(&slice, ..70), [3, 4, 5, 6, 7]);
+    assert_eq!(*Rcs::index(&slice, 3..8), [6, 7]);
 }
 
 impl<T: ?Sized> Clone for RcSlice<T> {

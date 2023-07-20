@@ -1,8 +1,8 @@
 [package]
 name = "rc-slice2"
-version = "0.4.0"
+version = "0.4.1"
 
-authors = ["Cole Miller <m@cole-miller.net>, Phlosioneer"]
+authors = ["Cole Miller <m@cole-miller.net>", "Phlosioneer"]
 categories = ["data-structures", "memory-management", "no-std"]
 keywords = ["rc", "arc", "slice", "range", "vector"]
 description = "Reference-counted slices with easy subdivision"
